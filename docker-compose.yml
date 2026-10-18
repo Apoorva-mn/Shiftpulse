@@ -1,0 +1,72 @@
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: shiftpulse-mysql
+
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: shiftpulse
+
+    ports:
+      - "3307:3306"
+
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-uroot",
+          "-proot"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+
+  backend:
+    build: ./backend
+    container_name: shiftpulse-backend
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+    environment:
+      DB_HOST: mysql
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: shiftpulse
+      PORT: 5000
+      JWT_SECRET: shiftpulse-secret
+
+    ports:
+      - "5000:5000"
+
+    command: sh -c "sleep 10 && node seed.js && npm start"
+
+
+  frontend:
+    build: ./frontend
+    container_name: shiftpulse-frontend
+
+    depends_on:
+      - backend
+
+    environment:
+      REACT_APP_API_URL: http://localhost:5000
+      HOST: 0.0.0.0
+
+    ports:
+      - "3000:3000"
+
+
+volumes:
+  mysql_data:
